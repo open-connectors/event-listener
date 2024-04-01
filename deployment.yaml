@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-listener
+  labels:
+    app: event-listener
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-listener
+  template:
+    metadata:
+      labels:
+        app: event-listener
+    spec:
+      containers:
+        - name: event-listener
+          image: quay.io/kmamgain/event-listener:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: event-listener
+              containerPort: 8080
