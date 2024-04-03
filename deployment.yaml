@@ -17,7 +17,7 @@ spec:
       containers:
         - name: event-listener
           image: quay.io/kmamgain/event-listener:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: event-listener
               containerPort: 8080

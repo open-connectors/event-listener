@@ -6,7 +6,7 @@ RUN apt-get install -y golang libc6
 WORKDIR /workspace
 
 COPY / /workspace/
-RUN go build .
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build .
 
 FROM debian:11
 WORKDIR /
