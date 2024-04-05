@@ -1,5 +1,14 @@
 package main
 
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+)
+
 func UploadPlanningData(repoId string, payload []CiBuildPayload) {
 	postBody, _ := json.Marshal(payload)
 	logilicaUrl := fmt.Sprintf("https://logilica.io/api/import/v1/ci_build/%v/create", repoId)
