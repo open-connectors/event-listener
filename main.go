@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"github.com/kelseyhightower/envconfig"
-	"log"
+	_ "github.com/kelseyhightower/envconfig"
+	_ "log"
 )
 
 // func getRoot(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +59,7 @@ func eventReceiver(ctx context.Context, event cloudevents.Event) error {
 	// return &responseEvent, nil
 	// do something with event
 	fmt.Println(event.String())
+	GetWorkflowRuns()
 	return nil
 }
 
@@ -87,5 +88,5 @@ func main() {
 		log.Fatalf("failed to start receiver: %s", err.Error())
 	}
 
-	// <-ctx.Done()
+	<-ctx.Done()
 }

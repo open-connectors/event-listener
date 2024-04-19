@@ -33,3 +33,56 @@ func UploadPlanningData(repoId string, payload []CiBuildPayload) {
 	}
 	fmt.Println(body)
 }
+
+func GetWorkflowRuns() {
+	runsUrl := "https://api.github.com/repos/open-connectors/open-connectors/actions/runs"
+	contentType := "Accept: application/vnd.github+json"
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", runsUrl, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %v", os.Getenv("API_TOKEN")))
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	var workflows WorkflowRuns
+	json.Unmarshal(body, &workflows)
+	fmt.Println(workflows.TotalCount)
+	metadata := GetWorkflowMetadata(workflows.WorkflowRuns[0].ID)
+}
+
+func GetWorkflowMetadata(id int64) RunMetadata {
+	runsUrl := fmt.Sprintf("https://api.github.com/repos/open-connectors/open-connectors/actions/runs/%d", id)
+	contentType := "Accept: application/vnd.github+json"
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", runsUrl, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %v", os.Getenv("API_TOKEN")))
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	var run RunMetadata
+	json.Unmarshal(body, &run)
+	return run
+}

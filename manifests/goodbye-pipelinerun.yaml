@@ -4,7 +4,10 @@ metadata:
   name: hello-goodbye-run
 spec:
   pipelineRef:
+    resolver: git
     name: hello-goodbye
   params:
   - name: username
     value: "Tekton"
+  - name: url
+    value: ${REPO_URL}
