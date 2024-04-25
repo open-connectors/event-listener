@@ -5,9 +5,15 @@ metadata:
 spec:
   pipelineRef:
     resolver: git
-    name: hello-goodbye
+    params:
+    - name: url
+      value: https://github.com/open-connectors/event-listener
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: /manifests/goodbye-pipeline.yaml
   params:
   - name: username
     value: "Tekton"
   - name: url
-    value: ${REPO_URL}
+    value: https://github.com/open-connectors/event-listener

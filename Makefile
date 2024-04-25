@@ -7,26 +7,17 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 all: help
 	@:
 
-IMAGE ?= quay.io/kmamgain/event-listener:latest
+IMAGE ?= quay.io/kmamgain/cdevent:latest
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 .PHONY: build # Build the container image
 build:
-	@docker buildx create --use --name=crossplat --node=crossplat && \
-	docker buildx build \
-		--output "type=docker,push=false" \
-		--tag $(IMAGE) \
-		.
+	podman build --platform linux/amd64,linux/arm64 -t quay.io/kmamgain/cdevent:latest  .
 
 .PHONY: publish # Push the image to the remote registry
 publish:
-	@docker buildx create --use --name=crossplat --node=crossplat && \
-	docker buildx build \
-		--platform linux/amd64,linux/arm64 \
-		--output "type=image,push=true" \
-		--tag $(IMAGE) \
-		.
+	podman push $(IMAGE)
 
 .PHONY: build-go
 build-go:

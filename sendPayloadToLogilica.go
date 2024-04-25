@@ -58,7 +58,7 @@ func GetWorkflowRuns() {
 	var workflows WorkflowRuns
 	json.Unmarshal(body, &workflows)
 	fmt.Println(workflows.TotalCount)
-	metadata := GetWorkflowMetadata(workflows.WorkflowRuns[0].ID)
+	GetWorkflowMetadata(workflows.WorkflowRuns[0].ID)
 }
 
 func GetWorkflowMetadata(id int64) RunMetadata {
