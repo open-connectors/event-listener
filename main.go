@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	_ "github.com/cloudevents/sdk-go/v2/protocol/http"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"log"
+	"time"
 )
 
 type envConfig struct {
@@ -18,75 +19,129 @@ type envConfig struct {
 	Path string `envconfig:"RCV_PATH" default:"/"`
 }
 
-// TektonCloudEventData type is used to marshal and unmarshal the payload of
-// a Tekton cloud event. It can include a TaskRun or a PipelineRun
-type TektonCloudEventData struct {
-	TaskRun     *v1beta1.TaskRun     `json:"taskRun,omitempty"`
-	PipelineRun *v1beta1.PipelineRun `json:"pipelineRun,omitempty"`
-	CustomRun   *v1beta1.CustomRun   `json:"customRun,omitempty"`
-}
-
-// newTektonCloudEventData returns a new instance of TektonCloudEventData
-func newTektonCloudEventData(ctx context.Context, runObject objectWithCondition) (TektonCloudEventData, error) {
-	tektonCloudEventData := TektonCloudEventData{}
-	switch v := runObject.(type) {
-	case *v1beta1.TaskRun:
-		tektonCloudEventData.TaskRun = v
-	case *v1beta1.PipelineRun:
-		tektonCloudEventData.PipelineRun = v
-	case *v1.TaskRun:
-		v1beta1TaskRun := &v1beta1.TaskRun{}
-		if err := v1beta1TaskRun.ConvertFrom(ctx, v); err != nil {
-			return TektonCloudEventData{}, err
-		}
-		tektonCloudEventData.TaskRun = v1beta1TaskRun
-	case *v1.PipelineRun:
-		v1beta1PipelineRun := &v1beta1.PipelineRun{}
-		if err := v1beta1PipelineRun.ConvertFrom(ctx, v); err != nil {
-			return TektonCloudEventData{}, err
-		}
-		tektonCloudEventData.PipelineRun = v1beta1PipelineRun
-	case *v1beta1.CustomRun:
-		tektonCloudEventData.CustomRun = v
-	}
-	return tektonCloudEventData, nil
+type Data struct {
+	Pipelinerun v1.PipelineRun `json:"pipelineRun"`
 }
 
 func eventReceiver(ctx context.Context, event cloudevents.Event) error {
-	fmt.Println("----------------- Reachinhe")
-	var object v1.PipelineRun
-	if err := json.Unmarshal(event.DataEncoded, &object); err != nil {
+	var dat Data
+	if err := json.Unmarshal(event.DataEncoded, &dat); err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(event.String())
-	fmt.Println("SPEC:", object.Spec)
-	fmt.Println("Status:", object.Status)
-	cdevent, _ := newTektonCloudEventData(ctx, event)
-	fmt.Println("EVENT", cdevent)
-	// PrepareCiBuildData(object)
-	fmt.Println("------------------")
+	var client *dynamodb.Client
+	var err error
+
+	if client, err = newclient(); err != nil {
+		log.Fatalf("failed to create dynamoclient: %s", err.Error())
+	}
+	fmt.Println("Pipleine run", dat.Pipelinerun)
+	InsertRecordInDatabase(dat.Pipelinerun, client)
 	return nil
 }
 
-// func PrepareCiBuildData(object v1.PipelineRun) {
-// 	payload = CiBuildPayload{
-// 	Origin          :"Tekton",
-// 	OriginalID      string        `json:"originalID"`
-// 	Name            : object.Spec.Name,
-// 	URL             string        `json:"url"`
-// 	CreatedAt       time.Time     `json:"createdAt"`
-// 	StartedAt       time.Time     `json:"startedAt"`
-// 	CompletedAt     time.Time     `json:"completedAt"`
-// 	TriggeredBy     :,
-// 	Status          :,
-// 	Conclusion      :,
-// 	RepoURL         :,
-// 	Commit          string        `json:"commit"`
-// 	PullRequestUrls []interface{} `json:"pullRequestUrls"`
-// 	IsDeployment    : true,
-// 	Stages          []Stage       `json:"stages"`
-// 	}
-// }
+func InsertRecordInDatabase(object v1.PipelineRun, client *dynamodb.Client) {
+	// tables, err := listTables(client, nil)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// var tableexists bool
+	// for _, val := range tables {
+	// 	if val == "TektonCI" {
+	// 		tableexists = true
+	// 	}
+	// }
+	// if !tableexists {
+	// 	input := &dynamodb.CreateTableInput{
+	// 		AttributeDefinitions: []types.AttributeDefinition{
+	// 			{
+	// 				AttributeName: aws.String("Origin"),
+	// 				AttributeType: types.ScalarAttributeTypeS,
+	// 			},
+	// 			{
+	// 				AttributeName: aws.String("OriginalID"),
+	// 				AttributeType: types.ScalarAttributeTypeS,
+	// 			},
+	// 			{
+	// 				AttributeName: aws.String("Name"),
+	// 				AttributeType: types.ScalarAttributeTypeS,
+	// 			},
+	// 		},
+	// 		KeySchema: []types.KeySchemaElement{
+	// 			{
+	// 				AttributeName: aws.String("OriginalID"),
+	// 				KeyType:       types.KeyTypeHash,
+	// 			},
+	// 			{
+	// 				AttributeName: aws.String("Name"),
+	// 				KeyType:       types.KeyTypeHash,
+	// 			},
+	// 		},
+	// 		ProvisionedThroughput: &types.ProvisionedThroughput{
+	// 			ReadCapacityUnits:  aws.Int64(10),
+	// 			WriteCapacityUnits: aws.Int64(10),
+	// 		},
+	// 		TableName: aws.String("TektonCI"),
+	// 	}
+	// 	err = createTable(client, "TektonCI", input)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// }
+	item := PrepareCiBuildData(object)
+	av, err := attributevalue.MarshalMap(item)
+	if err != nil {
+		fmt.Println("failed to marshal Record, %w", err)
+	}
+	fmt.Println("Inserting in the database")
+	fmt.Println("-----------NEW-----------------")
+	fmt.Println(av)
+	fmt.Println("-----------BETWEEN----------------")
+	fmt.Println("Response from put api ", putItem(client, "TektonCI", av))
+}
+
+func PrepareCiBuildData(obj v1.PipelineRun) CiBuildPayload {
+	payload := CiBuildPayload{
+		Origin:          "Tekton",
+		OriginalID:      string(obj.UID),
+		Name:            obj.Name,
+		URL:             obj.Status.Provenance.RefSource.URI,
+		CreatedAt:       obj.Status.StartTime.Time.Unix(),
+		StartedAt:       obj.Status.StartTime.Time.Unix(),
+		CompletedAt:     obj.Status.CompletionTime.Time.Unix(),
+		TriggeredBy:     "Pipelines Operator",
+		Status:          string(obj.Status.Conditions[0].Type),
+		Conclusion:      string(obj.Status.Conditions[0].Status),
+		RepoURL:         obj.Status.Provenance.RefSource.URI,
+		Commit:          "",
+		PullRequestUrls: nil,
+		IsDeployment:    true,
+	}
+	var tasks []Job
+	for _, val := range obj.Status.ChildReferences {
+		job := Job{
+			StartedAt:   obj.Status.StartTime.Time.Unix(),
+			CompletedAt: obj.Status.CompletionTime.Time.Unix(),
+			Name:        val.Name,
+			Status:      string(obj.Status.Conditions[0].Status),
+			Conclusion:  obj.Status.Conditions[0].Reason,
+		}
+		tasks = append(tasks, job)
+	}
+	var stg []Stage
+	stage := Stage{
+		ID:          string(obj.UID),
+		Name:        obj.Name,
+		StartedAt:   obj.Status.StartTime.Time.Unix(),
+		CompletedAt: obj.Status.CompletionTime.Time.Unix(),
+		Status:      string(obj.Status.Conditions[0].Status),
+		Conclusion:  obj.Status.Conditions[0].Reason,
+		URL:         obj.Status.Provenance.RefSource.URI,
+		Jobs:        tasks,
+	}
+	stg = append(stg, stage)
+	payload.Stages = stg
+	return payload
+}
 
 func main() {
 	var env envConfig
@@ -108,10 +163,33 @@ func main() {
 		log.Fatalf("failed to create client: %s", err.Error())
 	}
 
+	var client *dynamodb.Client
+
+	if client, err = newclient(); err != nil {
+		log.Fatalf("failed to create dynamoclient: %s", err.Error())
+	}
+
+	go func() {
+		t := time.Tick(1 * time.Hour)
+		for {
+			select {
+			case <-t:
+				LogilicaUpload(ctx, client)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	log.Printf("listening on :%d%s\n", env.Port, env.Path)
 	if err := c.StartReceiver(ctx, eventReceiver); err != nil {
 		log.Fatalf("failed to start receiver: %s", err.Error())
 	}
 
 	<-ctx.Done()
+}
+
+func LogilicaUpload(ctx context.Context, client *dynamodb.Client) {
+	payload := getCiBuildPayload(ctx, client)
+	UploadPlanningData("872a7985dd8a58328dea96015b738c317039fb5a", payload)
 }

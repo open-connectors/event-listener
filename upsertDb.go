@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	_ "github.com/cloudevents/sdk-go/v2"
 )
-
-const ()
 
 // DynoObject represents an object in dynamoDB.
 // Used to represent key value data such as keys, table items...
@@ -23,15 +23,23 @@ type DynoNotation map[string]types.AttributeValue
 // newclient constructs a new dynamodb client using a default configuration
 // and a provided profile name (created via aws configure cmd).
 func newclient() (*dynamodb.Client, error) {
+	region := os.Getenv("REGION")
+	url := os.Getenv("URL")
+	accsKeyID := os.Getenv("ACCESSKEYID")
+	secretAccessKey := os.Getenv("SECRETACCESSKEY")
+	fmt.Println(region, "REGION")
+	fmt.Println(url, "URL")
+	fmt.Println(accsKeyID, "ACCESSKEYID")
+	fmt.Println(secretAccessKey, "SECRETACCESSKEY")
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion("localhost"),
+		config.WithRegion(region),
 		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
 			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{URL: "http://localhost:8000"}, nil
+				return aws.Endpoint{URL: url}, nil
 			})),
 		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
 			Value: aws.Credentials{
-				AccessKeyID: "abcd", SecretAccessKey: "a1b2c3", SessionToken: "",
+				AccessKeyID: accsKeyID, SecretAccessKey: secretAccessKey, SessionToken: "",
 				Source: "Mock credentials used above for local instance",
 			},
 		}),
@@ -92,40 +100,65 @@ func putItem(c *dynamodb.Client, tableName string, item DynoNotation) (err error
 	return nil
 }
 
-// putItems batch inserts multiple items in to a dynamodb table.
-func putItems(c *dynamodb.Client, tableName string, items []DynoNotation) (err error) {
-	// dynamodb batch limit is 25
-	if len(items) > 25 {
-		return fmt.Errorf("Max batch size is 25, attempted `%d`", len(items))
-	}
+// // putItems batch inserts multiple items in to a dynamodb table.
+// func putItems(c *dynamodb.Client, tableName string, items []DynoNotation) (err error) {
+// 	// dynamodb batch limit is 25
+// 	if len(items) > 25 {
+// 		return fmt.Errorf("Max batch size is 25, attempted `%d`", len(items))
+// 	}
 
-	// create requests
-	writeRequests := make([]types.WriteRequest, len(items))
-	for i, item := range items {
-		writeRequests[i] = types.WriteRequest{PutRequest: &types.PutRequest{Item: item}}
-	}
+// 	// create requests
+// 	writeRequests := make([]types.WriteRequest, len(items))
+// 	for i, item := range items {
+// 		writeRequests[i] = types.WriteRequest{PutRequest: &types.PutRequest{Item: item}}
+// 	}
 
-	// write batch
-	_, err = c.BatchWriteItem(
-		context.TODO(),
-		&dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]types.WriteRequest{tableName: writeRequests},
-		},
-	)
+// 	// write batch
+// 	_, err = c.BatchWriteItem(
+// 		context.TODO(),
+// 		&dynamodb.BatchWriteItemInput{
+// 			RequestItems: map[string][]types.WriteRequest{tableName: writeRequests},
+// 		},
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+// // getItem returns an item if found based on the key provided.
+// // the key could be either a primary or composite key and values map.
+// func getItem(c *dynamodb.Client, tableName string, key DynoNotation) (item DynoNotation, err error) {
+// 	resp, err := c.GetItem(context.TODO(), &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return resp.Item, nil //
+// }
+
+func getCiBuildPayload(ctx context.Context, client *dynamodb.Client) []CiBuildPayload {
+	var payload []CiBuildPayload
+	originAttr, _ := attributevalue.Marshal("Tekton")
+	keyExpr := expression.Key("Origin").Equal(expression.Value(originAttr))
+	expr, err := expression.NewBuilder().WithKeyCondition(keyExpr).Build()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-
-	return nil
-}
-
-// getItem returns an item if found based on the key provided.
-// the key could be either a primary or composite key and values map.
-func getItem(c *dynamodb.Client, tableName string, key DynoNotation) (item DynoNotation, err error) {
-	resp, err := c.GetItem(context.TODO(), &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
+	query, err := client.Query(context.TODO(), &dynamodb.QueryInput{
+		TableName:                 aws.String("TektonCI"),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		KeyConditionExpression:    expr.KeyCondition(),
+	})
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
-
-	return resp.Item, nil //
+	// unmarshal list of items
+	err = attributevalue.UnmarshalListOfMaps(query.Items, &payload)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return payload
 }
