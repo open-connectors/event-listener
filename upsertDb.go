@@ -27,10 +27,7 @@ func newclient() (*dynamodb.Client, error) {
 	url := os.Getenv("URL")
 	accsKeyID := os.Getenv("ACCESSKEYID")
 	secretAccessKey := os.Getenv("SECRETACCESSKEY")
-	fmt.Println(region, "REGION")
 	fmt.Println(url, "URL")
-	fmt.Println(accsKeyID, "ACCESSKEYID")
-	fmt.Println(secretAccessKey, "SECRETACCESSKEY")
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(region),
 		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
@@ -138,10 +135,10 @@ func putItem(c *dynamodb.Client, tableName string, item DynoNotation) (err error
 // 	return resp.Item, nil //
 // }
 
-func getCiBuildPayload(ctx context.Context, client *dynamodb.Client) []CiBuildPayload {
+func getCiBuildPayload(client *dynamodb.Client) []CiBuildPayload {
 	var payload []CiBuildPayload
 	originAttr, _ := attributevalue.Marshal("Tekton")
-	keyExpr := expression.Key("Origin").Equal(expression.Value(originAttr))
+	keyExpr := expression.Key("origin").Equal(expression.Value(originAttr))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyExpr).Build()
 	if err != nil {
 		log.Fatal(err)

@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	"log"
-	"time"
+	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 )
 
 type envConfig struct {
@@ -26,7 +27,7 @@ type Data struct {
 func eventReceiver(ctx context.Context, event cloudevents.Event) error {
 	var dat Data
 	if err := json.Unmarshal(event.DataEncoded, &dat); err != nil {
-		fmt.Println(err)
+		fmt.Println("Ignore")
 	}
 	var client *dynamodb.Client
 	var err error
@@ -170,11 +171,12 @@ func main() {
 	}
 
 	go func() {
-		t := time.Tick(1 * time.Hour)
+		t := time.Tick(5 * time.Minute)
 		for {
 			select {
 			case <-t:
-				LogilicaUpload(ctx, client)
+				fmt.Println("Logilica Upload")
+				LogilicaUpload(client)
 			case <-ctx.Done():
 				return
 			}
@@ -189,7 +191,7 @@ func main() {
 	<-ctx.Done()
 }
 
-func LogilicaUpload(ctx context.Context, client *dynamodb.Client) {
-	payload := getCiBuildPayload(ctx, client)
+func LogilicaUpload(client *dynamodb.Client) {
+	payload := getCiBuildPayload(client)
 	UploadPlanningData("872a7985dd8a58328dea96015b738c317039fb5a", payload)
 }
