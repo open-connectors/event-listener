@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -27,10 +25,6 @@ func newclient() (*dynamodb.Client, error) {
 	url := os.Getenv("URL")
 	accsKeyID := os.Getenv("ACCESSKEYID")
 	secretAccessKey := os.Getenv("SECRETACCESSKEY")
-	fmt.Println(region, "REGION")
-	fmt.Println(url, "URL")
-	fmt.Println(accsKeyID, "ACCESSKEYID")
-	fmt.Println(secretAccessKey, "SECRETACCESSKEY")
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(region),
 		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
@@ -52,46 +46,64 @@ func newclient() (*dynamodb.Client, error) {
 	return c, nil
 }
 
-// createTable creates a table in the client's dynamodb instance
-// using the table parameters specified in input.
-func createTable(c *dynamodb.Client,
-	tableName string, input *dynamodb.CreateTableInput,
-) error {
-	var tableDesc *types.TableDescription
-	table, err := c.CreateTable(context.TODO(), input)
-	if err != nil {
-		log.Printf("Failed to create table `%v` with error: %v\n", tableName, err)
-	} else {
-		waiter := dynamodb.NewTableExistsWaiter(c)
-		err = waiter.Wait(context.TODO(), &dynamodb.DescribeTableInput{
-			TableName: aws.String(tableName)}, 5*time.Minute)
-		if err != nil {
-			log.Printf("Failed to wait on create table `%v` with error: %v\n", tableName, err)
-		}
-		tableDesc = table.TableDescription
-	}
-	fmt.Printf("Created table `%s` with details: %v\n\n", tableName, tableDesc)
+// // createTable creates a table in the client's dynamodb instance
+// // using the table parameters specified in input.
+// func createTable(c *dynamodb.Client,
+// 	tableName string, input *dynamodb.CreateTableInput,
+// ) error {
+// 	var tableDesc *types.TableDescription
+// 	table, err := c.CreateTable(context.TODO(), input)
+// 	if err != nil {
+// 		log.Printf("Failed to create table `%v` with error: %v\n", tableName, err)
+// 	} else {
+// 		waiter := dynamodb.NewTableExistsWaiter(c)
+// 		err = waiter.Wait(context.TODO(), &dynamodb.DescribeTableInput{
+// 			TableName: aws.String(tableName)}, 5*time.Minute)
+// 		if err != nil {
+// 			log.Printf("Failed to wait on create table `%v` with error: %v\n", tableName, err)
+// 		}
+// 		tableDesc = table.TableDescription
+// 	}
+// 	fmt.Printf("Created table `%s` with details: %v\n\n", tableName, tableDesc)
 
-	return err
-}
+// 	return err
+// }
 
-// listTables returns a list of table names in the client's dynamodb instance.
-func listTables(c *dynamodb.Client, input *dynamodb.ListTablesInput) ([]string, error) {
-	tables, err := c.ListTables(
-		context.TODO(),
-		&dynamodb.ListTablesInput{},
-	)
-	if err != nil {
-		return nil, err
-	}
+// // listTables returns a list of table names in the client's dynamodb instance.
+// func listTables(c *dynamodb.Client, input *dynamodb.ListTablesInput) ([]string, error) {
+// 	tables, err := c.ListTables(
+// 		context.TODO(),
+// 		&dynamodb.ListTablesInput{},
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return tables.TableNames, nil
-}
+// 	return tables.TableNames, nil
+// }
 
 // putItem inserts an item (key + attributes) in to a dynamodb table.
 func putItem(c *dynamodb.Client, tableName string, item DynoNotation) (err error) {
 	_, err = c.PutItem(context.TODO(), &dynamodb.PutItemInput{
-		TableName: aws.String(tableName), Item: item,
+		TableName: aws.String(tableName),
+		Item:      item,
+		// Item: map[string]types.AttributeValue{
+		// 	"origin":          &types.AttributeValueMemberS{Value: item.Origin},
+		// 	"originalID":      &types.AttributeValueMemberS{Value: item.OriginalID},
+		// 	"name":            &types.AttributeValueMemberS{Value: item.Name},
+		// 	"url":             &types.AttributeValueMemberS{Value: item.URL},
+		// 	"createdAt":       &types.AttributeValueMemberN{Value: item.CreatedAt},
+		// 	"startedAt":       &types.AttributeValueMemberN{Value: item.StartedAt},
+		// 	"completedAt":     &types.AttributeValueMemberN{Value: item.CompletedAt},
+		// 	"triggeredBy":     &types.AttributeValueMemberS{Value: item.TriggeredBy},
+		// 	"status":          &types.AttributeValueMemberS{Value: item.Status},
+		// 	"conclusion":      &types.AttributeValueMemberS{Value: item.Conclusion},
+		// 	"repoUrl":         &types.AttributeValueMemberS{Value: item.RepoURL},
+		// 	"commit":          &types.AttributeValueMemberS{Value: ""},
+		// 	"pullRequestUrls": &types.AttributeValueMemberL{Value: nil},
+		// 	"isDeployment":    &types.AttributeValueMemberBOOL{Value: false},
+		// 	"stages":          &types.AttributeValueMemberM{Value: item.Stages},
+		// },
 	})
 	if err != nil {
 		return err
@@ -138,7 +150,7 @@ func putItem(c *dynamodb.Client, tableName string, item DynoNotation) (err error
 // 	return resp.Item, nil //
 // }
 
-func getCiBuildPayload(ctx context.Context, client *dynamodb.Client) []CiBuildPayload {
+func getCiBuildPayload(client *dynamodb.Client) []CiBuildPayload {
 	var payload []CiBuildPayload
 	originAttr, _ := attributevalue.Marshal("Tekton")
 	keyExpr := expression.Key("Origin").Equal(expression.Value(originAttr))

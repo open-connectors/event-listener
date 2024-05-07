@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	"log"
-	"time"
+	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 )
 
 type envConfig struct {
@@ -190,6 +191,6 @@ func main() {
 }
 
 func LogilicaUpload(ctx context.Context, client *dynamodb.Client) {
-	payload := getCiBuildPayload(ctx, client)
+	payload := getCiBuildPayload(client)
 	UploadPlanningData("872a7985dd8a58328dea96015b738c317039fb5a", payload)
 }

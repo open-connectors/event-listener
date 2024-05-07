@@ -59,7 +59,7 @@ spec:
         config-events:
           data:
             formats: tektonv1
-            sink: http://test-default.apps.rosa.yftts-of83d-y6h.iqwv.p3.openshiftapps.com
+            sink: http://test-default.apps.rosa.nr947-sesrs-cqo.omfp.p3.openshiftapps.com
           metadata:
             creationTimestamp: null
       disabled: false
