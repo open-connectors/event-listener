@@ -6,6 +6,7 @@ package main
 // snippet-start:[dynamodb.go.load_items.imports]
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"fmt"
 	"log"
@@ -24,10 +26,10 @@ import (
 // snippet-start:[dynamodb.go.load_items.struct]
 // Create struct to hold info about new item
 type Item struct {
-	Year   int
-	Title  string
-	Plot   string
-	Rating float64
+	Year   int     `dynamodbav:"year"`
+	Title  string  `dynamodbav:"title"`
+	Plot   string  `dynamodbav:"plot,omitempty"`
+	Rating float64 `dynamodbav:"rating,omitempty"`
 }
 
 // snippet-end:[dynamodb.go.load_items.func]
@@ -67,6 +69,32 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+	// Add each item to Movies table:
+	tableName := "Movies"
+	// _, err = c.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
+	// 	AttributeDefinitions: []types.AttributeDefinition{{
+	// 		AttributeName: aws.String("year"),
+	// 		AttributeType: types.ScalarAttributeTypeN,
+	// 	}, {
+	// 		AttributeName: aws.String("title"),
+	// 		AttributeType: types.ScalarAttributeTypeS,
+	// 	}},
+	// 	KeySchema: []types.KeySchemaElement{{
+	// 		AttributeName: aws.String("year"),
+	// 		KeyType:       types.KeyTypeHash,
+	// 	}, {
+	// 		AttributeName: aws.String("title"),
+	// 		KeyType:       types.KeyTypeRange,
+	// 	}},
+	// 	TableName: aws.String(tableName),
+	// 	ProvisionedThroughput: &types.ProvisionedThroughput{
+	// 		ReadCapacityUnits:  aws.Int64(10),
+	// 		WriteCapacityUnits: aws.Int64(10),
+	// 	},
+	// })
+	// if err != nil {
+	// 	log.Printf("Couldn't create table %v. Here's why: %v\n", tableName, err)
+	// }
 	// sess := session.Must(session.NewSessionWithOptions(session.Options{
 	// 	SharedConfigState: session.SharedConfigEnable,
 	// }))
@@ -79,9 +107,6 @@ func main() {
 		Plot:   "Nothing happens at all.",
 		Rating: 0.0,
 	}
-
-	// Add each item to Movies table:
-	tableName := "Movies"
 
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
@@ -96,13 +121,30 @@ func main() {
 
 	_, err = c.PutItem(context.TODO(), input)
 	if err != nil {
-		log.Fatalf("Got error calling PutItem: %s", err)
+		fmt.Println("Got error calling PutItem: %s", err)
 	}
 
 	year := strconv.Itoa(item.Year)
 
 	fmt.Println("Successfully added '" + item.Title + "' (" + year + ") to table " + tableName)
 	// snippet-end:[dynamodb.go.load_items.call]
+
+	exists := true
+	_, err = c.DescribeTable(
+		context.TODO(), &dynamodb.DescribeTableInput{TableName: aws.String(tableName)},
+	)
+	fmt.Println(err)
+	if err != nil {
+		var notFoundEx *types.ResourceNotFoundException
+		if errors.As(err, &notFoundEx) {
+			fmt.Println("Table %v does not exist.\n", tableName)
+			err = nil
+		} else {
+			fmt.Println("Couldn't determine existence of table %v. Here's why: %v\n", tableName, err)
+		}
+		exists = false
+	}
+	fmt.Println(exists)
 }
 
 // snippet-end:[dynamodb.go.load_items]
