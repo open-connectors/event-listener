@@ -1,196 +1,108 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+// snippet-start:[dynamodb.go.load_items]
 package main
 
+// snippet-start:[dynamodb.go.load_items.imports]
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"time"
+	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"github.com/kelseyhightower/envconfig"
-	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+
+	"fmt"
+	"log"
+	"strconv"
 )
 
-type envConfig struct {
-	// Port on which to listen for cloudevents
-	Port int    `envconfig:"RCV_PORT" default:"8080"`
-	Path string `envconfig:"RCV_PATH" default:"/"`
+// snippet-end:[dynamodb.go.load_items.imports]
+
+// snippet-start:[dynamodb.go.load_items.struct]
+// Create struct to hold info about new item
+type Item struct {
+	Year   int
+	Title  string
+	Plot   string
+	Rating float64
 }
 
-type Data struct {
-	Pipelinerun v1.PipelineRun `json:"pipelineRun"`
-}
+// snippet-end:[dynamodb.go.load_items.func]
 
-func eventReceiver(ctx context.Context, event cloudevents.Event) error {
-	var dat Data
-	if err := json.Unmarshal(event.DataEncoded, &dat); err != nil {
-		fmt.Println(err)
-	}
-	var client *dynamodb.Client
-	var err error
-
-	if client, err = newclient(); err != nil {
-		log.Fatalf("failed to create dynamoclient: %s", err.Error())
-	}
-	fmt.Println("Pipleine run", dat.Pipelinerun)
-	InsertRecordInDatabase(dat.Pipelinerun, client)
-	return nil
-}
-
-func InsertRecordInDatabase(object v1.PipelineRun, client *dynamodb.Client) {
-	// tables, err := listTables(client, nil)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// var tableexists bool
-	// for _, val := range tables {
-	// 	if val == "TektonCI" {
-	// 		tableexists = true
-	// 	}
-	// }
-	// if !tableexists {
-	// 	input := &dynamodb.CreateTableInput{
-	// 		AttributeDefinitions: []types.AttributeDefinition{
-	// 			{
-	// 				AttributeName: aws.String("Origin"),
-	// 				AttributeType: types.ScalarAttributeTypeS,
-	// 			},
-	// 			{
-	// 				AttributeName: aws.String("OriginalID"),
-	// 				AttributeType: types.ScalarAttributeTypeS,
-	// 			},
-	// 			{
-	// 				AttributeName: aws.String("Name"),
-	// 				AttributeType: types.ScalarAttributeTypeS,
-	// 			},
-	// 		},
-	// 		KeySchema: []types.KeySchemaElement{
-	// 			{
-	// 				AttributeName: aws.String("OriginalID"),
-	// 				KeyType:       types.KeyTypeHash,
-	// 			},
-	// 			{
-	// 				AttributeName: aws.String("Name"),
-	// 				KeyType:       types.KeyTypeHash,
-	// 			},
-	// 		},
-	// 		ProvisionedThroughput: &types.ProvisionedThroughput{
-	// 			ReadCapacityUnits:  aws.Int64(10),
-	// 			WriteCapacityUnits: aws.Int64(10),
-	// 		},
-	// 		TableName: aws.String("TektonCI"),
-	// 	}
-	// 	err = createTable(client, "TektonCI", input)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 	}
-	// }
-	item := PrepareCiBuildData(object)
-	av, err := attributevalue.MarshalMap(item)
+func newclient() (*dynamodb.Client, error) {
+	region := os.Getenv("REGION")
+	url := os.Getenv("URL")
+	accsKeyID := os.Getenv("ACCESSKEYID")
+	secretAccessKey := os.Getenv("SECRETACCESSKEY")
+	fmt.Println(region, "REGION")
+	fmt.Println(url, "URL")
+	fmt.Println(accsKeyID, "ACCESSKEYID")
+	fmt.Println(secretAccessKey, "SECRETACCESSKEY")
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(region),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{URL: url}, nil
+			})),
+		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID: accsKeyID, SecretAccessKey: secretAccessKey, SessionToken: "",
+				Source: "Mock credentials used above for local instance",
+			},
+		}),
+	)
 	if err != nil {
-		fmt.Println("failed to marshal Record, %w", err)
+		return nil, err
 	}
-	fmt.Println("Inserting in the database")
-	fmt.Println("-----------NEW-----------------")
-	fmt.Println(av)
-	fmt.Println("-----------BETWEEN----------------")
-	fmt.Println("Response from put api ", putItem(client, "TektonCI", av))
-}
 
-func PrepareCiBuildData(obj v1.PipelineRun) CiBuildPayload {
-	payload := CiBuildPayload{
-		Origin:          "Tekton",
-		OriginalID:      string(obj.UID),
-		Name:            obj.Name,
-		URL:             obj.Status.Provenance.RefSource.URI,
-		CreatedAt:       obj.Status.StartTime.Time.Unix(),
-		StartedAt:       obj.Status.StartTime.Time.Unix(),
-		CompletedAt:     obj.Status.CompletionTime.Time.Unix(),
-		TriggeredBy:     "Pipelines Operator",
-		Status:          string(obj.Status.Conditions[0].Type),
-		Conclusion:      string(obj.Status.Conditions[0].Status),
-		RepoURL:         obj.Status.Provenance.RefSource.URI,
-		Commit:          "",
-		PullRequestUrls: nil,
-		IsDeployment:    true,
-	}
-	var tasks []Job
-	for _, val := range obj.Status.ChildReferences {
-		job := Job{
-			StartedAt:   obj.Status.StartTime.Time.Unix(),
-			CompletedAt: obj.Status.CompletionTime.Time.Unix(),
-			Name:        val.Name,
-			Status:      string(obj.Status.Conditions[0].Status),
-			Conclusion:  obj.Status.Conditions[0].Reason,
-		}
-		tasks = append(tasks, job)
-	}
-	var stg []Stage
-	stage := Stage{
-		ID:          string(obj.UID),
-		Name:        obj.Name,
-		StartedAt:   obj.Status.StartTime.Time.Unix(),
-		CompletedAt: obj.Status.CompletionTime.Time.Unix(),
-		Status:      string(obj.Status.Conditions[0].Status),
-		Conclusion:  obj.Status.Conditions[0].Reason,
-		URL:         obj.Status.Provenance.RefSource.URI,
-		Jobs:        tasks,
-	}
-	stg = append(stg, stage)
-	payload.Stages = stg
-	return payload
+	c := dynamodb.NewFromConfig(cfg)
+	return c, nil
 }
 
 func main() {
-	var env envConfig
-	if err := envconfig.Process("", &env); err != nil {
-		log.Fatalf("Failed to process env var: %s", err)
-	}
-	log.Print("Starting Event Listener")
-	ctx := context.Background()
-
-	p, err := cloudevents.NewHTTP(cloudevents.WithPort(env.Port), cloudevents.WithPath(env.Path))
+	c, err := newclient()
 	if err != nil {
-		log.Fatalf("failed to create protocol: %s", err.Error())
+		fmt.Println(err)
 	}
-	c, err := cloudevents.NewClient(p,
-		cloudevents.WithUUIDs(),
-		cloudevents.WithTimeNow(),
-	)
+	// sess := session.Must(session.NewSessionWithOptions(session.Options{
+	// 	SharedConfigState: session.SharedConfigEnable,
+	// }))
+
+	// // Create DynamoDB client
+	// svc := dynamodb.New(sess)
+	item := Item{
+		Year:   2015,
+		Title:  "The Big New Movie",
+		Plot:   "Nothing happens at all.",
+		Rating: 0.0,
+	}
+
+	// Add each item to Movies table:
+	tableName := "Movies"
+
+	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
-		log.Fatalf("failed to create client: %s", err.Error())
+		log.Fatalf("Got error marshalling map: %s", err)
 	}
 
-	var client *dynamodb.Client
-
-	if client, err = newclient(); err != nil {
-		log.Fatalf("failed to create dynamoclient: %s", err.Error())
+	// Create item in table Movies
+	input := &dynamodb.PutItemInput{
+		Item:      av,
+		TableName: aws.String(tableName),
 	}
 
-	go func() {
-		t := time.Tick(1 * time.Hour)
-		for {
-			select {
-			case <-t:
-				LogilicaUpload(ctx, client)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	log.Printf("listening on :%d%s\n", env.Port, env.Path)
-	if err := c.StartReceiver(ctx, eventReceiver); err != nil {
-		log.Fatalf("failed to start receiver: %s", err.Error())
+	_, err = c.PutItem(context.TODO(), input)
+	if err != nil {
+		log.Fatalf("Got error calling PutItem: %s", err)
 	}
 
-	<-ctx.Done()
+	year := strconv.Itoa(item.Year)
+
+	fmt.Println("Successfully added '" + item.Title + "' (" + year + ") to table " + tableName)
+	// snippet-end:[dynamodb.go.load_items.call]
 }
 
-func LogilicaUpload(ctx context.Context, client *dynamodb.Client) {
-	payload := getCiBuildPayload(client)
-	UploadPlanningData("872a7985dd8a58328dea96015b738c317039fb5a", payload)
-}
+// snippet-end:[dynamodb.go.load_items]

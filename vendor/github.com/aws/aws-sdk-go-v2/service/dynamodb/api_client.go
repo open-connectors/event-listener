@@ -111,14 +111,12 @@ func (c *Client) invokeOperation(ctx context.Context, opID string, params interf
 
 	for _, fn := range stackFns {
 		if err := fn(stack, options); err != nil {
-			fmt.Println("Returning here 1",err)
 			return nil, metadata, err
 		}
 	}
 
 	for _, fn := range options.APIOptions {
 		if err := fn(stack); err != nil {
-			fmt.Println("Returning here 2",err)
 			return nil, metadata, err
 		}
 	}
@@ -126,14 +124,15 @@ func (c *Client) invokeOperation(ctx context.Context, opID string, params interf
 	handler := middleware.DecorateHandler(smithyhttp.NewClientHandler(options.HTTPClient), stack)
 	result, metadata, err = handler.Handle(ctx, params)
 	if err != nil {
-		fmt.Println("Returning here 3",err)
+		fmt.Println(result)
+		fmt.Println(metadata)
+		fmt.Println(err)
 		err = &smithy.OperationError{
 			ServiceID:     ServiceID,
 			OperationName: opID,
 			Err:           err,
 		}
 	}
-	fmt.Println("Returning here 4",err)
 	return result, metadata, err
 }
 
