@@ -124,9 +124,6 @@ func (c *Client) invokeOperation(ctx context.Context, opID string, params interf
 	handler := middleware.DecorateHandler(smithyhttp.NewClientHandler(options.HTTPClient), stack)
 	result, metadata, err = handler.Handle(ctx, params)
 	if err != nil {
-		fmt.Println(result)
-		fmt.Println(metadata)
-		fmt.Println(err)
 		err = &smithy.OperationError{
 			ServiceID:     ServiceID,
 			OperationName: opID,

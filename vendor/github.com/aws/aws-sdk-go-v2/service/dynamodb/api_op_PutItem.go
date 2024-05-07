@@ -37,6 +37,9 @@ func (c *Client) PutItem(ctx context.Context, params *PutItemInput, optFns ...fu
 
 	result, metadata, err := c.invokeOperation(ctx, "PutItem", params, optFns, c.addOperationPutItemMiddlewares)
 	if err != nil {
+		fmt.Println(result)
+		fmt.Println(metadata)
+		fmt.Println(err)
 		return nil, err
 	}
 

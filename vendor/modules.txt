@@ -47,6 +47,7 @@ github.com/aws/aws-sdk-go-v2/credentials/stscreds
 github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue
 # github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.7.14
 ## explicit; go 1.20
+github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression
 # github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.1
 ## explicit; go 1.20
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds
