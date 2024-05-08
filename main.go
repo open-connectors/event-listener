@@ -109,7 +109,6 @@ func PrepareCiBuildData(obj v1.PipelineRun) CiBuildPayload {
 		CreatedAt:       obj.Status.StartTime.Time.Unix(),
 		StartedAt:       obj.Status.StartTime.Time.Unix(),
 		CompletedAt:     obj.Status.CompletionTime.Time.Unix(),
-		TriggeredBy:     "Pipelines Operator",
 		Status:          string(obj.Status.Conditions[0].Type),
 		Conclusion:      string(obj.Status.Conditions[0].Status),
 		RepoURL:         obj.Status.Provenance.RefSource.URI,
@@ -117,6 +116,14 @@ func PrepareCiBuildData(obj v1.PipelineRun) CiBuildPayload {
 		PullRequestUrls: nil,
 		IsDeployment:    true,
 	}
+	triggeredBy := TriggeredBy{
+		Name:         "Pipelines Operator",
+		Email:        "dummy@redhat.com",
+		AccountId:    "dummy@redhat.com",
+		LastActivity: obj.Status.Conditions[0].LastTransitionTime.Inner.Unix(),
+	}
+	payload.TriggeredBy = triggeredBy
+
 	var tasks []Job
 	for _, val := range obj.Status.ChildReferences {
 		job := Job{

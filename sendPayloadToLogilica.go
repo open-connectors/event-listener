@@ -31,7 +31,8 @@ func UploadPlanningData(repoId string, payload []CiBuildPayload) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(body)
+	fmt.Println(string(body))
+	fmt.Println(resp.StatusCode)
 }
 
 func GetWorkflowRuns() {
