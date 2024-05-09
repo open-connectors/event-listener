@@ -148,6 +148,10 @@ func main() {
 	// }
 	// fmt.Println(exists)
 	payload := getCiBuildPayload(c)
+	var pullrequests []string
+	pullrequests = append(pullrequests, "pr")
+	payload[0].PullRequestUrls = pullrequests
+	payload[1].PullRequestUrls = pullrequests
 	UploadPlanningData("872a7985dd8a58328dea96015b738c317039fb5a", payload)
 }
 
