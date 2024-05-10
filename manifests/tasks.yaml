@@ -20,7 +20,7 @@ spec:
     type: string
   steps:
     - name: goodbye
-      image: ubuntu
+      image: alpine
       script: |
         #!/bin/bash
         echo "Goodbye $(params.username)!"
